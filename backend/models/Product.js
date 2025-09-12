@@ -1,3 +1,4 @@
+// models/Product.js
 const mongoose = require('mongoose');
 
 const ProductSchema = new mongoose.Schema({
@@ -20,8 +21,12 @@ const ProductSchema = new mongoose.Schema({
     required: true
   },
   image: {
-    type: String, // Can store image URL or local path
-    required: false // Optional, but can be made required if every product must have an image
+    type: String, // Will store Cloudinary URL
+    required: false
+  },
+  cloudinaryId: { // Store Cloudinary public_id for future management
+    type: String,
+    required: false
   },
   createdAt: {
     type: Date,

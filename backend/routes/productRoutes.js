@@ -1,3 +1,4 @@
+// routes/productRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -8,7 +9,7 @@ const {
   deleteProduct
 } = require('../controllers/productController');
 const { protect, adminProtect } = require('../middleware/auth');
-const upload = require('../utils/productImageUpload'); // Multer config
+const { upload } = require('../config/cloudinary'); // Cloudinary upload middleware
 
 // Public Routes
 router.route('/')
@@ -17,7 +18,7 @@ router.route('/')
 router.route('/:id')
   .get(getProductById);
 
-// Admin Routes with image upload
+// Admin Routes with Cloudinary image upload
 router.route('/')
   .post(adminProtect, upload.single('image'), createProduct);
 

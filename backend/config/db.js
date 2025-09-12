@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
-const MONGO_URI = "mongodb://localhost:27017/tshirt-customization"
-// const MONGO_URI = "mongodb+srv://rrao3426_db_user:8INWhRJSNLRSEvic@cluster0.ijaaetb.mongodb.net/myDatabase?retryWrites=true&w=majority&appName=Cluster0"
+// const MONGO_URI = "mongodb://localhost:27017/tshirt-customization"
+const MONGO_URI = "mongodb+srv://rrao3426_db_user:8INWhRJSNLRSEvic@cluster0.ijaaetb.mongodb.net/myDatabase?retryWrites=true&w=majority&appName=Cluster0"
 
 
 const connectDB = async () => {
