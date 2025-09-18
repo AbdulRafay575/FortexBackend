@@ -15,11 +15,23 @@ const CartItemSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  stylee: {  // Shirt style
+    type: String,
+    required: false
+  },
   design: {
-    type: String, // Path or URL to the design image
+    type: String, // Cloudinary URL
+    required: false
+  },
+  designCloudinaryId: {
+    type: String, // Cloudinary public_id
     required: false
   },
   customText: {
+    type: String,
+    required: false
+  },
+  pattern: {
     type: String,
     required: false
   },

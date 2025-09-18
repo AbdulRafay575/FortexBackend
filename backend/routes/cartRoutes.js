@@ -1,3 +1,4 @@
+// routes/cartRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -7,14 +8,14 @@ const {
   removeFromCart
 } = require('../controllers/cartController');
 const { protect } = require('../middleware/auth');
-const upload = require('../utils/fileUpload'); // your multer config
+const { upload } = require('../config/cloudinary'); // ✅ reuse your product upload middleware
 
 router.route('/')
   .get(protect, getCart)
-  .post(protect, upload, addToCart); // <-- attach multer middleware here
+  .post(protect, upload.single('design'), addToCart); // upload design to Cloudinary
 
 router.route('/:itemId')
-  .put(protect, updateCartItem)
+  .put(protect, upload.single('design'), updateCartItem) // allow replacing design
   .delete(protect, removeFromCart);
 
 module.exports = router;
