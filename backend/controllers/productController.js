@@ -27,9 +27,8 @@ const getProductById = asyncHandler(async (req, res) => {
 // @route   POST /api/admin/products
 // @access  Private/Admin
 const createProduct = asyncHandler(async (req, res) => {
-  const { name, description, price, availableSizes, availableColors } = req.body;
+  const { name, description, price, availableSizes, availableColors, stylee } = req.body;
   
-  // Cloudinary provides these in req.file
   const image = req.file ? req.file.path : null;
   const cloudinaryId = req.file ? req.file.filename : null;
 
@@ -39,6 +38,7 @@ const createProduct = asyncHandler(async (req, res) => {
     price,
     availableSizes: Array.isArray(availableSizes) ? availableSizes : JSON.parse(availableSizes || '[]'),
     availableColors: Array.isArray(availableColors) ? availableColors : JSON.parse(availableColors || '[]'),
+    stylee: stylee || 'Regular', // <-- NEW
     image,
     cloudinaryId
   });
@@ -47,16 +47,17 @@ const createProduct = asyncHandler(async (req, res) => {
   res.status(201).json(createdProduct);
 });
 
+
 // @desc    Update a product
 // @route   PUT /api/admin/products/:id
 // @access  Private/Admin
+
 const updateProduct = asyncHandler(async (req, res) => {
-  const { name, description, price, availableSizes, availableColors } = req.body;
-  
+  const { name, description, price, availableSizes, availableColors, stylee } = req.body;
+
   const product = await Product.findById(req.params.id);
 
   if (product) {
-    // If new image is uploaded, delete old one from Cloudinary
     if (req.file && product.cloudinaryId) {
       try {
         await deleteFromCloudinary(product.cloudinaryId);
@@ -70,7 +71,8 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.price = price || product.price;
     product.availableSizes = availableSizes || product.availableSizes;
     product.availableColors = availableColors || product.availableColors;
-    
+    product.stylee = stylee || product.stylee; // <-- NEW
+
     if (req.file) {
       product.image = req.file.path;
       product.cloudinaryId = req.file.filename;
@@ -83,6 +85,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     throw new Error('Product not found');
   }
 });
+
 
 // @desc    Delete a product
 // @route   DELETE /api/admin/products/:id

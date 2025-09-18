@@ -20,6 +20,10 @@ const ProductSchema = new mongoose.Schema({
     type: [String],
     required: true
   },
+   stylee: {               // <-- NEW FIELD
+    type: String,
+        required: true
+  },
   image: {
     type: String, // Will store Cloudinary URL
     required: false
