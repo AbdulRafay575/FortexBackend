@@ -28,34 +28,42 @@ const getProductById = asyncHandler(async (req, res) => {
 // @route   POST /api/products
 // @access  Private/Admin
 const createProduct = asyncHandler(async (req, res) => {
-  const { name, description, price, availableSizes, availableColors, stylee } = req.body;
-  
-  // FIXED: Properly handle multiple images
-  const images = req.files && req.files.length > 0 ? req.files.map((file, index) => ({
-    url: file.path,
-    cloudinaryId: file.filename || file.public_id,
-    isPrimary: index === 0 // First image is primary by default
-  })) : [];
+  try {
+    console.log('REQ.BODY:', req.body);
+    console.log('REQ.FILES:', req.files);
 
-  // Validate required fields
-  if (!name || !price) {
-    res.status(400);
-    throw new Error('Name and price are required');
+    const { name, description, price, availableSizes, availableColors, stylee } = req.body;
+
+    const images = Array.isArray(req.files) && req.files.length > 0
+      ? req.files.map((file, index) => ({
+          url: file.path,
+          cloudinaryId: file.filename || file.public_id || file.originalname,
+          isPrimary: index === 0
+        }))
+      : [];
+
+    if (!name || !price) {
+      return res.status(400).json({ message: 'Name and price are required' });
+    }
+
+    const product = new Product({
+      name,
+      description,
+      price,
+      availableSizes: Array.isArray(availableSizes) ? availableSizes : (availableSizes ? JSON.parse(availableSizes) : []),
+      availableColors: Array.isArray(availableColors) ? availableColors : (availableColors ? JSON.parse(availableColors) : []),
+      stylee: stylee || 'Regular',
+      images
+    });
+
+    const createdProduct = await product.save();
+    res.status(201).json(createdProduct);
+  } catch (error) {
+    console.error('🔥 CREATE PRODUCT ERROR:', error);
+    res.status(500).json({ message: error.message });
   }
-
-  const product = new Product({
-    name,
-    description,
-    price,
-    availableSizes: Array.isArray(availableSizes) ? availableSizes : (availableSizes ? JSON.parse(availableSizes) : []),
-    availableColors: Array.isArray(availableColors) ? availableColors : (availableColors ? JSON.parse(availableColors) : []),
-    stylee: stylee || 'Regular',
-    images
-  });
-
-  const createdProduct = await product.save();
-  res.status(201).json(createdProduct);
 });
+
 
 // @desc    Update a product
 // @route   PUT /api/products/:id
