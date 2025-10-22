@@ -1,3 +1,4 @@
+// controllers/productController.js
 const Product = require('../models/Product');
 const asyncHandler = require('express-async-handler');
 const { deleteFromCloudinary } = require('../config/cloudinary');
@@ -28,42 +29,28 @@ const getProductById = asyncHandler(async (req, res) => {
 // @route   POST /api/products
 // @access  Private/Admin
 const createProduct = asyncHandler(async (req, res) => {
-  try {
-    console.log('REQ.BODY:', req.body);
-    console.log('REQ.FILES:', req.files);
+  const { name, description, price, availableSizes, availableColors, stylee } = req.body;
+  
+  // UPDATED: Handle multiple images
+  const images = req.files ? req.files.map((file, index) => ({
+    url: file.path,
+    cloudinaryId: file.filename,
+    isPrimary: index === 0 // First image is primary by default
+  })) : [];
 
-    const { name, description, price, availableSizes, availableColors, stylee } = req.body;
+  const product = new Product({
+    name,
+    description,
+    price,
+    availableSizes: Array.isArray(availableSizes) ? availableSizes : JSON.parse(availableSizes || '[]'),
+    availableColors: Array.isArray(availableColors) ? availableColors : JSON.parse(availableColors || '[]'),
+    stylee: stylee || 'Regular',
+    images
+  });
 
-    const images = Array.isArray(req.files) && req.files.length > 0
-      ? req.files.map((file, index) => ({
-          url: file.path,
-          cloudinaryId: file.filename || file.public_id || file.originalname,
-          isPrimary: index === 0
-        }))
-      : [];
-
-    if (!name || !price) {
-      return res.status(400).json({ message: 'Name and price are required' });
-    }
-
-    const product = new Product({
-      name,
-      description,
-      price,
-      availableSizes: Array.isArray(availableSizes) ? availableSizes : (availableSizes ? JSON.parse(availableSizes) : []),
-      availableColors: Array.isArray(availableColors) ? availableColors : (availableColors ? JSON.parse(availableColors) : []),
-      stylee: stylee || 'Regular',
-      images
-    });
-
-    const createdProduct = await product.save();
-    res.status(201).json(createdProduct);
-  } catch (error) {
-    console.error('🔥 CREATE PRODUCT ERROR:', error);
-    res.status(500).json({ message: error.message });
-  }
+  const createdProduct = await product.save();
+  res.status(201).json(createdProduct);
 });
-
 
 // @desc    Update a product
 // @route   PUT /api/products/:id
@@ -74,12 +61,12 @@ const updateProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
 
   if (product) {
-    // FIXED: Handle new images properly
+    // UPDATED: Handle new images
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => ({
         url: file.path,
-        cloudinaryId: file.filename || file.public_id,
-        isPrimary: false // New images are not primary by default
+        cloudinaryId: file.filename,
+        isPrimary: false
       }));
       
       // Add new images to existing ones
@@ -89,16 +76,8 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.name = name || product.name;
     product.description = description || product.description;
     product.price = price || product.price;
-    
-    // FIXED: Handle arrays properly
-    if (availableSizes) {
-      product.availableSizes = Array.isArray(availableSizes) ? availableSizes : JSON.parse(availableSizes);
-    }
-    
-    if (availableColors) {
-      product.availableColors = Array.isArray(availableColors) ? availableColors : JSON.parse(availableColors);
-    }
-    
+    product.availableSizes = availableSizes || product.availableSizes;
+    product.availableColors = availableColors || product.availableColors;
     product.stylee = stylee || product.stylee;
 
     const updatedProduct = await product.save();
