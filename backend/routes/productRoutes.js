@@ -1,4 +1,3 @@
-// routes/productRoutes.js - Complete updated version
 const express = require('express');
 const router = express.Router();
 const {
@@ -22,10 +21,10 @@ router.route('/:id')
 
 // Admin Routes with multiple image upload
 router.route('/')
-  .post(adminProtect, upload.array('images', 5), createProduct);
+  .post(adminProtect, upload.array('images', 10), createProduct); // Increased to 10 images max
 
 router.route('/:id')
-  .put(adminProtect, upload.array('images', 5), updateProduct)
+  .put(adminProtect, upload.array('images', 10), updateProduct)
   .delete(adminProtect, deleteProduct);
 
 // Image management routes

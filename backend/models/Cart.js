@@ -15,7 +15,7 @@ const CartItemSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  stylee: {  // Shirt style
+  stylee: {
     type: String,
     required: false
   },

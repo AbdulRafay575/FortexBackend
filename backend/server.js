@@ -33,7 +33,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Enable CORS
-app.use(cors());
+const corsOptions = {
+  origin: 'http://127.0.0.1:5501', // your frontend origin
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 
 // Set static folder
 app.use('/designs', express.static(path.join(__dirname, 'public/designs')));

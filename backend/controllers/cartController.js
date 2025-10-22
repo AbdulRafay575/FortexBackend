@@ -18,145 +18,291 @@ const getCart = asyncHandler(async (req, res) => {
     await cart.save();
   }
 
-  res.json(cart);
+  res.json({
+    success: true,
+    data: cart
+  });
 });
 
 // @desc    Add item to cart
 // @route   POST /api/cart
 // @access  Private
 const addToCart = asyncHandler(async (req, res) => {
-  const { productId, size, color, stylee, customText, pattern, quantity } = req.body;
+  try {
+    console.log('Add to cart request body:', req.body);
+    console.log('Uploaded file:', req.file);
 
-  const product = await Product.findById(productId);
-  if (!product) {
-    res.status(404);
-    throw new Error('Product not found');
-  }
+    const { productId, size, color, stylee, customText, pattern, quantity = 1 } = req.body;
 
-  // Validate size and color
-  if (!product.availableSizes.includes(size)) {
-    res.status(400);
-    throw new Error('Invalid size for this product');
-  }
-  if (!product.availableColors.map(c => c.toLowerCase()).includes(color.toLowerCase())) {
-    res.status(400);
-    throw new Error('Invalid color for this product');
-  }
+    // Validate required fields
+    if (!productId || !size || !color) {
+      return res.status(400).json({
+        success: false,
+        message: 'Product ID, size, and color are required'
+      });
+    }
 
-  // Cloudinary design upload
-  const designUrl = req.file ? req.file.path : null;
-  const designCloudinaryId = req.file ? req.file.filename : null;
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found'
+      });
+    }
 
-  const cartItem = {
-    product: productId,
-    size,
-    color,
-    stylee,
-    design: designUrl,
-    designCloudinaryId,
-    customText,
-    pattern,
-    quantity: Number(quantity),
-    priceAtAddition: product.price
-  };
+    // Validate size and color
+    if (!product.availableSizes.includes(size)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid size for this product'
+      });
+    }
 
-  let cart = await Cart.findOne({ user: req.user._id });
+    const availableColors = product.availableColors.map(c => c.toLowerCase());
+    if (!availableColors.includes(color.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid color for this product'
+      });
+    }
 
-  if (cart) {
-    const itemIndex = cart.items.findIndex(
-      item =>
-        item.product.toString() === productId &&
-        item.size === size &&
-        item.color === color &&
-        item.stylee === stylee &&
-        item.customText === customText &&
-        item.pattern === pattern &&
-        item.design === designUrl
+    // Handle design upload
+    let designUrl = null;
+    let designCloudinaryId = null;
+    
+    if (req.file) {
+      designUrl = req.file.path;
+      designCloudinaryId = req.file.filename;
+      console.log('Design uploaded:', { designUrl, designCloudinaryId });
+    }
+
+    const cartItem = {
+      product: productId,
+      size,
+      color,
+      stylee: stylee || 'Regular',
+      design: designUrl,
+      designCloudinaryId,
+      customText: customText || '',
+      pattern: pattern || '',
+      quantity: parseInt(quantity),
+      priceAtAddition: product.price
+    };
+
+    let cart = await Cart.findOne({ user: req.user._id });
+
+    if (cart) {
+      // Check if item already exists with same specifications
+      const itemIndex = cart.items.findIndex(
+        item =>
+          item.product.toString() === productId &&
+          item.size === size &&
+          item.color.toLowerCase() === color.toLowerCase() &&
+          item.stylee === (stylee || 'Regular') &&
+          item.customText === (customText || '') &&
+          item.pattern === (pattern || '') &&
+          item.design === designUrl
+      );
+
+      if (itemIndex > -1) {
+        // Update quantity if item exists
+        cart.items[itemIndex].quantity += parseInt(quantity);
+      } else {
+        // Add new item
+        cart.items.push(cartItem);
+      }
+    } else {
+      // Create new cart
+      cart = new Cart({
+        user: req.user._id,
+        items: [cartItem]
+      });
+    }
+
+    // Calculate total
+    cart.total = cart.items.reduce(
+      (acc, item) => acc + (item.priceAtAddition * item.quantity),
+      0
     );
 
-    if (itemIndex > -1) {
-      cart.items[itemIndex].quantity += Number(quantity);
-    } else {
-      cart.items.push(cartItem);
+    cart.updatedAt = new Date();
+
+    const updatedCart = await cart.save();
+    await updatedCart.populate('items.product');
+
+    res.status(201).json({
+      success: true,
+      message: 'Item added to cart successfully',
+      data: updatedCart
+    });
+
+  } catch (error) {
+    console.error('Add to cart error:', error);
+    
+    // Clean up uploaded file if error occurs
+    if (req.file) {
+      try {
+        await deleteFromCloudinary(req.file.filename);
+      } catch (deleteError) {
+        console.error('Error cleaning up uploaded design:', deleteError);
+      }
     }
-  } else {
-    cart = new Cart({
-      user: req.user._id,
-      items: [cartItem]
+    
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error adding item to cart'
     });
   }
-
-  cart.total = cart.items.reduce(
-    (acc, item) => acc + item.priceAtAddition * item.quantity,
-    0
-  );
-
-  const updatedCart = await cart.save();
-  res.status(201).json(updatedCart);
 });
 
 // @desc    Update cart item
 // @route   PUT /api/cart/:itemId
 // @access  Private
 const updateCartItem = asyncHandler(async (req, res) => {
-  const { quantity, size, color, stylee, customText, pattern } = req.body;
+  try {
+    const { quantity, size, color, stylee, customText, pattern } = req.body;
+    console.log('Update cart item request:', req.params.itemId, req.body);
 
-  const cart = await Cart.findOne({ user: req.user._id });
-  if (!cart) return res.status(404).json({ message: 'Cart not found' });
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart not found'
+      });
+    }
 
-  const itemIndex = cart.items.findIndex(
-    item => item._id.toString() === req.params.itemId
-  );
-  if (itemIndex === -1) return res.status(404).json({ message: 'Item not found in cart' });
+    const itemIndex = cart.items.findIndex(
+      item => item._id.toString() === req.params.itemId
+    );
 
-  const item = cart.items[itemIndex];
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found in cart'
+      });
+    }
 
-  // Replace design if new file uploaded
-  if (req.file) {
-    if (item.designCloudinaryId) {
+    const item = cart.items[itemIndex];
+
+    // Replace design if new file uploaded
+    if (req.file) {
+      // Delete old design from Cloudinary if exists
+      if (item.designCloudinaryId) {
+        try {
+          await deleteFromCloudinary(item.designCloudinaryId);
+        } catch (err) {
+          console.error('Error deleting old design from Cloudinary:', err);
+        }
+      }
+      item.design = req.file.path;
+      item.designCloudinaryId = req.file.filename;
+    }
+
+    // Update fields
+    if (quantity !== undefined) item.quantity = parseInt(quantity);
+    if (size) item.size = size;
+    if (stylee !== undefined) item.stylee = stylee;
+    if (color) item.color = color;
+    if (pattern !== undefined) item.pattern = pattern;
+    if (customText !== undefined) item.customText = customText;
+
+    // Recalculate total
+    cart.total = cart.items.reduce(
+      (acc, item) => acc + (item.priceAtAddition * item.quantity),
+      0
+    );
+
+    cart.updatedAt = new Date();
+
+    const updatedCart = await cart.save();
+    await updatedCart.populate('items.product');
+
+    res.json({
+      success: true,
+      message: 'Cart item updated successfully',
+      data: updatedCart
+    });
+
+  } catch (error) {
+    console.error('Update cart item error:', error);
+    
+    // Clean up uploaded file if error occurs
+    if (req.file) {
       try {
-        await deleteFromCloudinary(item.designCloudinaryId);
-      } catch (err) {
-        console.error('Error deleting old design from Cloudinary:', err);
+        await deleteFromCloudinary(req.file.filename);
+      } catch (deleteError) {
+        console.error('Error cleaning up uploaded design:', deleteError);
       }
     }
-    item.design = req.file.path;
-    item.designCloudinaryId = req.file.filename;
+    
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error updating cart item'
+    });
   }
-
-  if (quantity) item.quantity = Number(quantity);
-  if (size) item.size = size;
-  if (stylee) item.stylee = stylee;
-  if (color) item.color = color;
-  if (pattern) item.pattern = pattern;
-  item.customText = customText !== undefined ? customText : item.customText;
-
-  cart.total = cart.items.reduce(
-    (acc, item) => acc + item.priceAtAddition * item.quantity,
-    0
-  );
-
-  const updatedCart = await cart.save();
-  res.json(updatedCart);
 });
 
 // @desc    Remove item from cart
 // @route   DELETE /api/cart/:itemId
 // @access  Private
 const removeFromCart = asyncHandler(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id });
-  if (!cart) throw new Error('Cart not found');
+  try {
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (!cart) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cart not found'
+      });
+    }
 
-  const itemIndex = cart.items.findIndex(item => item._id.toString() === req.params.itemId);
+    const itemIndex = cart.items.findIndex(
+      item => item._id.toString() === req.params.itemId
+    );
 
-  if (itemIndex > -1) {
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Item not found in cart'
+      });
+    }
+
+    const itemToRemove = cart.items[itemIndex];
+
+    // Delete design from Cloudinary if exists
+    if (itemToRemove.designCloudinaryId) {
+      try {
+        await deleteFromCloudinary(itemToRemove.designCloudinaryId);
+      } catch (err) {
+        console.error('Error deleting design from Cloudinary:', err);
+      }
+    }
+
+    // Remove item from cart
     cart.items.splice(itemIndex, 1);
-    cart.total = cart.items.reduce((acc, item) => acc + item.priceAtAddition * item.quantity, 0);
+    
+    // Recalculate total
+    cart.total = cart.items.reduce(
+      (acc, item) => acc + (item.priceAtAddition * item.quantity),
+      0
+    );
+
+    cart.updatedAt = new Date();
+
     const updatedCart = await cart.save();
-    res.json(updatedCart);
-  } else {
-    res.status(404);
-    throw new Error('Item not found in cart');
+    await updatedCart.populate('items.product');
+
+    res.json({
+      success: true,
+      message: 'Item removed from cart successfully',
+      data: updatedCart
+    });
+
+  } catch (error) {
+    console.error('Remove from cart error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error removing item from cart'
+    });
   }
 });
 

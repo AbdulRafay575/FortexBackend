@@ -1,4 +1,3 @@
-// routes/cartRoutes.js
 const express = require('express');
 const router = express.Router();
 const {
@@ -8,14 +7,14 @@ const {
   removeFromCart
 } = require('../controllers/cartController');
 const { protect } = require('../middleware/auth');
-const { upload } = require('../config/cloudinary'); // ✅ reuse your product upload middleware
+const { designUpload } = require('../config/cloudinary'); // Use design upload for cart
 
 router.route('/')
   .get(protect, getCart)
-  .post(protect, upload.single('design'), addToCart); // upload design to Cloudinary
+  .post(protect, designUpload.single('design'), addToCart);
 
 router.route('/:itemId')
-  .put(protect, upload.single('design'), updateCartItem) // allow replacing design
+  .put(protect, designUpload.single('design'), updateCartItem)
   .delete(protect, removeFromCart);
 
 module.exports = router;

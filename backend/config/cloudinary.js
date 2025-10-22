@@ -1,36 +1,70 @@
-// config/cloudinary.js
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.CLOUD_API_KEY,
+  api_secret: process.env.CLOUD_API_SECRET,
 });
 
-// UPDATED: Configure storage for multiple files
-const storage = new CloudinaryStorage({
+// Configure multer storage for Cloudinary - PRODUCTS
+const productStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 'tshirt-products',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp']
-  }
+    folder: 'fortex-products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [
+      { width: 800, height: 800, crop: 'limit', quality: 'auto' }
+    ]
+  },
 });
 
-// UPDATED: Use multer for multiple files
-const upload = multer({ 
-  storage: storage,
+// Configure multer storage for Cloudinary - DESIGNS (Cart)
+const designStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'fortex-designs',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [
+      { width: 800, height: 800, crop: 'limit', quality: 'auto' }
+    ]
+  },
+});
+
+// File filter
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed!'), false);
+  }
+};
+
+// Configure multer for products
+const productUpload = multer({
+  storage: productStorage,
+  fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit per file
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   }
 });
 
-// Function to delete from Cloudinary
+// Configure multer for designs
+const designUpload = multer({
+  storage: designStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  }
+});
+
+// Delete from Cloudinary
 const deleteFromCloudinary = async (publicId) => {
   try {
-    await cloudinary.uploader.destroy(publicId);
+    const result = await cloudinary.uploader.destroy(publicId);
+    return result;
   } catch (error) {
     console.error('Error deleting from Cloudinary:', error);
     throw error;
@@ -38,7 +72,8 @@ const deleteFromCloudinary = async (publicId) => {
 };
 
 module.exports = {
-  upload,
+  upload: productUpload, // Default for products
+  designUpload, // For cart designs
   deleteFromCloudinary,
   cloudinary
 };
