@@ -33,7 +33,7 @@ const createProduct = asyncHandler(async (req, res) => {
   // FIXED: Properly handle multiple images
   const images = req.files && req.files.length > 0 ? req.files.map((file, index) => ({
     url: file.path,
-    cloudinaryId: file.filename,
+    cloudinaryId: file.filename || file.public_id,
     isPrimary: index === 0 // First image is primary by default
   })) : [];
 
@@ -70,7 +70,7 @@ const updateProduct = asyncHandler(async (req, res) => {
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => ({
         url: file.path,
-        cloudinaryId: file.filename,
+        cloudinaryId: file.filename || file.public_id,
         isPrimary: false // New images are not primary by default
       }));
       
