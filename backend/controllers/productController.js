@@ -1,4 +1,3 @@
-// controllers/productController.js
 const Product = require('../models/Product');
 const asyncHandler = require('express-async-handler');
 const { deleteFromCloudinary } = require('../config/cloudinary');
@@ -31,19 +30,25 @@ const getProductById = asyncHandler(async (req, res) => {
 const createProduct = asyncHandler(async (req, res) => {
   const { name, description, price, availableSizes, availableColors, stylee } = req.body;
   
-  // UPDATED: Handle multiple images
-  const images = req.files ? req.files.map((file, index) => ({
+  // FIXED: Properly handle multiple images
+  const images = req.files && req.files.length > 0 ? req.files.map((file, index) => ({
     url: file.path,
     cloudinaryId: file.filename,
     isPrimary: index === 0 // First image is primary by default
   })) : [];
 
+  // Validate required fields
+  if (!name || !price) {
+    res.status(400);
+    throw new Error('Name and price are required');
+  }
+
   const product = new Product({
     name,
     description,
     price,
-    availableSizes: Array.isArray(availableSizes) ? availableSizes : JSON.parse(availableSizes || '[]'),
-    availableColors: Array.isArray(availableColors) ? availableColors : JSON.parse(availableColors || '[]'),
+    availableSizes: Array.isArray(availableSizes) ? availableSizes : (availableSizes ? JSON.parse(availableSizes) : []),
+    availableColors: Array.isArray(availableColors) ? availableColors : (availableColors ? JSON.parse(availableColors) : []),
     stylee: stylee || 'Regular',
     images
   });
@@ -61,12 +66,12 @@ const updateProduct = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
 
   if (product) {
-    // UPDATED: Handle new images
+    // FIXED: Handle new images properly
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => ({
         url: file.path,
         cloudinaryId: file.filename,
-        isPrimary: false
+        isPrimary: false // New images are not primary by default
       }));
       
       // Add new images to existing ones
@@ -76,8 +81,16 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.name = name || product.name;
     product.description = description || product.description;
     product.price = price || product.price;
-    product.availableSizes = availableSizes || product.availableSizes;
-    product.availableColors = availableColors || product.availableColors;
+    
+    // FIXED: Handle arrays properly
+    if (availableSizes) {
+      product.availableSizes = Array.isArray(availableSizes) ? availableSizes : JSON.parse(availableSizes);
+    }
+    
+    if (availableColors) {
+      product.availableColors = Array.isArray(availableColors) ? availableColors : JSON.parse(availableColors);
+    }
+    
     product.stylee = stylee || product.stylee;
 
     const updatedProduct = await product.save();

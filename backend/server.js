@@ -11,9 +11,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 // console.log('JWT_SECRET Loaded:', process.env.JWT_SECRET);
 
-
-
-
 // Connect to database
 connectDB();
 
