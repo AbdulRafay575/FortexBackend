@@ -7,8 +7,8 @@ dotenv.config();
 mongoose.connect(process.env.MONGO_URI)
   .then(async () => {
     const newAdmin = new Admin({
-      email: 'admin@example.com',
-      password: 'MyStrongPass123'
+      email: 'fortexshirts@gmail.com',
+      password: 'k#r8Pz!v2LmQb7'
     });
 
     await newAdmin.save();

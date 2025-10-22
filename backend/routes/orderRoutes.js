@@ -6,7 +6,9 @@ const {
   getMyOrders,
   updateOrderToPaid,
   updateOrderStatus,
-  getOrders
+  getOrders,
+  handlePaymentCallback,
+  getOrderStatus
 } = require('../controllers/orderController');
 const { protect, adminProtect } = require('../middleware/auth');
 
@@ -14,8 +16,12 @@ router.route('/')
   .post(protect, createOrder)
   .get(protect, getMyOrders);
 
+router.route('/payment-callback')
+  .post(handlePaymentCallback);
+
 router.route('/:id').get(protect, getOrderById);
 router.route('/:id/pay').put(protect, updateOrderToPaid);
+router.route('/:orderId/status').get(protect, getOrderStatus);
 
 // Admin routes
 router.route('/admin/orders').get(adminProtect, getOrders);

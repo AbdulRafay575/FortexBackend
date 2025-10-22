@@ -1,39 +1,44 @@
+// config/cloudinary.js
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_API_KEY,
-  api_secret: process.env.CLOUD_API_SECRET
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Configure Multer Storage for Cloudinary
+// UPDATED: Configure storage for multiple files
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: 't-shirt-app/products',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif'],
-    transformation: [{ width: 500, height: 500, crop: 'limit' }]
-  },
+    folder: 'tshirt-products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp']
+  }
 });
 
-const upload = multer({ storage: storage });
+// UPDATED: Use multer for multiple files
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit per file
+  }
+});
 
-// Function to delete image from Cloudinary
+// Function to delete from Cloudinary
 const deleteFromCloudinary = async (publicId) => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId);
-    return result;
+    await cloudinary.uploader.destroy(publicId);
   } catch (error) {
-    console.error('Error deleting image from Cloudinary:', error);
+    console.error('Error deleting from Cloudinary:', error);
     throw error;
   }
 };
 
 module.exports = {
-  cloudinary,
   upload,
-  deleteFromCloudinary
+  deleteFromCloudinary,
+  cloudinary
 };

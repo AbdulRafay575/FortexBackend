@@ -20,18 +20,25 @@ const ProductSchema = new mongoose.Schema({
     type: [String],
     required: true
   },
-   stylee: {               // <-- NEW FIELD
+  stylee: {
     type: String,
-        required: true
+    required: true
   },
-  image: {
-    type: String, // Will store Cloudinary URL
-    required: false
-  },
-  cloudinaryId: { // Store Cloudinary public_id for future management
-    type: String,
-    required: false
-  },
+  // UPDATED: Changed from single image to array of images
+  images: [{
+    url: {
+      type: String, // Cloudinary URL
+      required: true
+    },
+    cloudinaryId: {
+      type: String, // Cloudinary public_id
+      required: true
+    },
+    isPrimary: {
+      type: Boolean,
+      default: false
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

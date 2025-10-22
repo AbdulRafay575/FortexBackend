@@ -1,4 +1,4 @@
-// routes/productRoutes.js
+// routes/productRoutes.js - Complete updated version
 const express = require('express');
 const router = express.Router();
 const {
@@ -6,10 +6,12 @@ const {
   getProductById,
   createProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  deleteProductImage,
+  setPrimaryImage
 } = require('../controllers/productController');
 const { protect, adminProtect } = require('../middleware/auth');
-const { upload } = require('../config/cloudinary'); // Cloudinary upload middleware
+const { upload } = require('../config/cloudinary');
 
 // Public Routes
 router.route('/')
@@ -18,12 +20,19 @@ router.route('/')
 router.route('/:id')
   .get(getProductById);
 
-// Admin Routes with Cloudinary image upload
+// Admin Routes with multiple image upload
 router.route('/')
-  .post(adminProtect, upload.single('image'), createProduct);
+  .post(adminProtect, upload.array('images', 5), createProduct);
 
 router.route('/:id')
-  .put(adminProtect, upload.single('image'), updateProduct)
+  .put(adminProtect, upload.array('images', 5), updateProduct)
   .delete(adminProtect, deleteProduct);
+
+// Image management routes
+router.route('/:id/images/:imageId')
+  .delete(adminProtect, deleteProductImage);
+
+router.route('/:id/images/:imageId/primary')
+  .patch(adminProtect, setPrimaryImage);
 
 module.exports = router;
