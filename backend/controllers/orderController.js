@@ -12,21 +12,18 @@ const { sendOrderConfirmationEmail } = require('../utils/emailService');
 const createOrder = asyncHandler(async (req, res) => {
   try {
     const { shippingDetails } = req.body;
-    console.log('🛒 CREATE ORDER STARTED ======================');
-    console.log('📦 Shipping details:', shippingDetails);
+    console.log('Creating order with shipping details:', shippingDetails);
 
     // Get user cart with populated products
     const cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
     if (!cart || cart.items.length === 0) {
-      console.log('❌ No items in cart for user:', req.user._id);
       return res.status(400).json({
         success: false,
         message: 'No items in cart'
       });
     }
 
-    console.log('📋 Cart items count:', cart.items.length);
-    console.log('💰 Cart total:', cart.total);
+    console.log('Cart items:', cart.items);
 
     // Create order with cart items including design information
     const order = new Order({
@@ -36,8 +33,8 @@ const createOrder = asyncHandler(async (req, res) => {
         product: item.product._id,
         size: item.size,
         color: item.color,
-        design: item.design,
-        designCloudinaryId: item.designCloudinaryId,
+        design: item.design, // Include design URL
+        designCloudinaryId: item.designCloudinaryId, // Include Cloudinary ID
         customText: item.customText,
         pattern: item.pattern,
         quantity: item.quantity,
@@ -49,13 +46,11 @@ const createOrder = asyncHandler(async (req, res) => {
     });
 
     const createdOrder = await order.save();
-    console.log('✅ Order created successfully:', createdOrder.orderId);
+    console.log('Order created:', createdOrder);
 
     // Prepare bank payment parameters
-    console.log('🏦 Preparing bank payment parameters...');
     const bankParams = prepareBankPayment(createdOrder);
 
-    console.log('📤 Sending bank payment data to frontend');
     res.json({
       success: true,
       message: 'Order created successfully',
@@ -64,7 +59,7 @@ const createOrder = asyncHandler(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ CREATE ORDER ERROR:', error);
+    console.error('Create order error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Error creating order'
@@ -82,9 +77,9 @@ const prepareBankPayment = (order) => {
     clientid: clientId,
     amount: order.totalAmount.toFixed(2),
     oid: order.orderId,
-    okUrl: `${process.env.FRONTEND_URL || 'http://127.0.0.1:5500'}/payment-success.html?orderId=${order.orderId}`,
-    failUrl: `${process.env.FRONTEND_URL || 'http://127.0.0.1:5500'}/payment-failed.html?orderId=${order.orderId}`,
-    rnd: Math.random().toString().substring(2, 18),
+    okUrl: `${process.env.FRONTEND_URL}/payment-success.html?orderId=${order.orderId}`,
+    failUrl: `${process.env.FRONTEND_URL}/payment-failed.html?orderId=${order.orderId}`,
+    rnd: Math.random().toString(),
     currency: '807',
     storetype: '3D_PAY_HOSTING',
     islemtipi: 'Auth',
@@ -93,11 +88,20 @@ const prepareBankPayment = (order) => {
     encoding: 'UTF-8'
   };
 
-  // 🔐 HASHv3: concatenate key=value&key=value... (sorted alphabetically)
-  const sortedKeys = Object.keys(params).sort();
-  const hashText = sortedKeys.map(k => `${k}=${params[k]}`).join('&') + `&storekey=${storeKey}`;
-  
-  const hash = crypto.createHash('sha512').update(hashText, 'utf8').digest('base64');
+  // Generate secure hash
+  const hashString = [
+    params.clientid,
+    params.oid,
+    params.amount,
+    params.okUrl,
+    params.failUrl,
+    params.islemtipi,
+    params.taksit,
+    params.rnd,
+    storeKey
+  ].join('');
+
+  const hash = crypto.createHash('sha512').update(hashString).digest('base64');
 
   return {
     bankUrl,
@@ -108,61 +112,94 @@ const prepareBankPayment = (order) => {
 // @desc    Handle bank payment callback
 // @route   POST /api/orders/payment-callback
 // @access  Public
-console.log('🔍 Verifying callback hash using Hashv3...');
+const handlePaymentCallback = asyncHandler(async (req, res) => {
+  try {
+    const { ReturnOid, Response, TransId, AuthCode, Hash } = req.body;
+    console.log('Payment callback received:', { ReturnOid, Response });
 
-const storeKey = process.env.BANK_STORE_KEY || 'SKEY0335';
+    const storeKey = process.env.BANK_STORE_KEY || 'SKEY0335';
+    const expectedHash = crypto.createHash('sha512')
+      .update([
+        req.body.clientid,
+        req.body.oid,
+        req.body.amount,
+        req.body.okUrl,
+        req.body.failUrl,
+        req.body.islemtipi,
+        req.body.taksit,
+        req.body.rnd,
+        storeKey
+      ].join(''))
+      .digest('base64');
 
-// Remove hash params before building string
-const callbackParams = { ...req.body };
-delete callbackParams.hash;
-delete callbackParams.HASH;
-delete callbackParams.signature;
+    if (Hash !== expectedHash) {
+      console.error('Invalid hash in payment callback');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid callback' 
+      });
+    }
 
-// Sort and rebuild like Hashv3
-const sortedKeys = Object.keys(callbackParams).sort();
-const hashText = sortedKeys.map(k => `${k}=${callbackParams[k]}`).join('&') + `&storekey=${storeKey}`;
-const expectedHash = crypto.createHash('sha512').update(hashText, 'utf8').digest('base64');
+    const order = await Order.findOne({ orderId: ReturnOid });
+    if (!order) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Order not found' 
+      });
+    }
 
-console.log('Expected Hash (last 10):', expectedHash.slice(-10));
-console.log('Received Hash (last 10):', (req.body.hash || req.body.HASH || '').slice(-10));
+    if (Response === 'Approved') {
+      order.paymentStatus = 'Paid';
+      order.paymentDetails = {
+        transactionId: TransId,
+        authCode: AuthCode,
+        paidAt: new Date()
+      };
+      
+      // Clear cart and send confirmation email
+      await Cart.findOneAndDelete({ user: order.user });
+      const user = await User.findById(order.user);
+      await sendOrderConfirmationEmail(user, order);
+      
+      console.log('Payment successful for order:', order.orderId);
+    } else {
+      order.paymentStatus = 'Failed';
+      console.log('Payment failed for order:', order.orderId);
+    }
 
-if ((req.body.hash || req.body.HASH) !== expectedHash) {
-  console.error('❌ HASH VERIFICATION FAILED — Payment will be marked failed');
-  return res.status(400).json({ 
-    success: false, 
-    message: 'Invalid callback - Hash verification failed' 
-  });
-}
+    await order.save();
 
-console.log('✅ Hash  successfully!');
+    res.json({ 
+      success: true, 
+      status: order.paymentStatus,
+      orderId: order.orderId
+    });
 
+  } catch (error) {
+    console.error('Payment callback error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing payment callback'
+    });
+  }
+});
 
 // @desc    Get order status
 // @route   GET /api/orders/:orderId/status
 // @access  Private
 const getOrderStatus = asyncHandler(async (req, res) => {
   try {
-    console.log('📊 GET ORDER STATUS ======================');
-    console.log('   Order ID:', req.params.orderId);
-    console.log('   User ID:', req.user._id);
-
     const order = await Order.findOne({
       orderId: req.params.orderId,
       user: req.user._id
     });
 
     if (!order) {
-      console.log('❌ Order not found');
       return res.status(404).json({
         success: false,
         message: 'Order not found'
       });
     }
-
-    console.log('✅ Order found:', order.orderId);
-    console.log('   Payment Status:', order.paymentStatus);
-    console.log('   Order Status:', order.orderStatus);
-    console.log('   Total Amount:', order.totalAmount);
 
     res.json({
       success: true,
@@ -173,7 +210,7 @@ const getOrderStatus = asyncHandler(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ GET ORDER STATUS ERROR:', error);
+    console.error('Get order status error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Error getting order status'
@@ -181,30 +218,22 @@ const getOrderStatus = asyncHandler(async (req, res) => {
   }
 });
 
-// Other existing functions with added logging...
+// Other existing functions remain the same...
 const getOrderById = asyncHandler(async (req, res) => {
-  console.log('🔍 GET ORDER BY ID:', req.params.id);
-  
   const order = await Order.findById(req.params.id).populate('items.product');
   if (order) {
-    console.log('✅ Order found:', order.orderId);
     res.json({
       success: true,
       data: order
     });
   } else {
-    console.log('❌ Order not found:', req.params.id);
     res.status(404);
     throw new Error('Order not found');
   }
 });
 
 const getMyOrders = asyncHandler(async (req, res) => {
-  console.log('📋 GET MY ORDERS for user:', req.user._id);
-  
   const orders = await Order.find({ user: req.user._id }).populate('items.product');
-  console.log(`✅ Found ${orders.length} orders for user`);
-  
   res.json({
     success: true,
     data: orders
@@ -212,11 +241,8 @@ const getMyOrders = asyncHandler(async (req, res) => {
 });
 
 const updateOrderToPaid = asyncHandler(async (req, res) => {
-  console.log('💳 UPDATE ORDER TO PAID:', req.params.id);
-  
   const order = await Order.findById(req.params.id);
   if (order) {
-    console.log('✅ Updating order payment status to Paid');
     order.paymentStatus = 'Paid';
     order.paymentDetails = { paidAt: Date.now(), ...req.body };
     const updatedOrder = await order.save();
@@ -225,19 +251,14 @@ const updateOrderToPaid = asyncHandler(async (req, res) => {
       data: updatedOrder
     });
   } else {
-    console.log('❌ Order not found for payment update:', req.params.id);
     res.status(404);
     throw new Error('Order not found');
   }
 });
 
 const updateOrderStatus = asyncHandler(async (req, res) => {
-  console.log('🔄 UPDATE ORDER STATUS:', req.params.id);
-  console.log('   New status:', req.body.status);
-  
   const order = await Order.findById(req.params.id);
   if (order) {
-    console.log('✅ Updating order status from', order.orderStatus, 'to', req.body.status);
     order.orderStatus = req.body.status || order.orderStatus;
     const updatedOrder = await order.save();
     res.json({
@@ -245,18 +266,13 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
       data: updatedOrder
     });
   } else {
-    console.log('❌ Order not found for status update:', req.params.id);
     res.status(404);
     throw new Error('Order not found');
   }
 });
 
 const getOrders = asyncHandler(async (req, res) => {
-  console.log('👑 ADMIN: GET ALL ORDERS');
-  
   const orders = await Order.find({}).populate('user', 'id name email').populate('items.product');
-  console.log(`✅ Found ${orders.length} total orders`);
-  
   res.json({
     success: true,
     data: orders
