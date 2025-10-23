@@ -34,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Enable CORS
 const corsOptions = {
-  origin: ['http://127.0.0.1:5500', 'http://127.0.0.1:5501','https://fortex.com.mk'], // allow multiple
+  origin: ['http://127.0.0.1:5500','https://fortex.com.mk'], // allow multiple
   methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
