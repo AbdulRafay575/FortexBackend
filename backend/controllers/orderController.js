@@ -109,6 +109,7 @@ const prepareBankPayment = (order) => {
 // @route   POST /api/orders/payment-callback
 // @access  Public
 console.log('🔍 Verifying callback hash using Hashv3...');
+console.log("🔙 Bank Callback Data:", req.body);
 
 const storeKey = process.env.BANK_STORE_KEY || 'SKEY0335';
 
