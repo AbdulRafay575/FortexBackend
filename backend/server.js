@@ -14,7 +14,7 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 // Connect to database
 connectDB();
 
-
+//good
 // Route files
 const productRoutes = require('./routes/productRoutes');
 const userRoutes = require('./routes/userRoutes');
