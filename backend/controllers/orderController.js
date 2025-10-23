@@ -117,7 +117,6 @@ const callbackParams = { ...req.body };
 delete callbackParams.hash;
 delete callbackParams.HASH;
 delete callbackParams.signature;
-console.log("🔙 Bank Callback Data:", req.body);
 
 // Sort and rebuild like Hashv3
 const sortedKeys = Object.keys(callbackParams).sort();
