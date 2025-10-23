@@ -134,7 +134,7 @@ if ((req.body.hash || req.body.HASH) !== expectedHash) {
   });
 }
 
-console.log('✅ Hash verified successfully!');
+console.log('✅ Hash  successfully!');
 
 
 // @desc    Get order status
