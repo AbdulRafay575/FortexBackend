@@ -8,8 +8,16 @@ const CartItemSchema = new mongoose.Schema({
   },
   size: {
     type: String,
-    enum: ['Small', 'Medium', 'Large', 'X-Large'],
-    required: true
+enum: [
+      'Small',
+      'Medium',
+      'Large',
+      'X-Large',
+      'XXL',
+      '3XL',
+      '4XL',
+      '5XL'
+    ],    required: true
   },
   color: {
     type: String,
