@@ -13,8 +13,17 @@ const ProductSchema = new mongoose.Schema({
   },
   availableSizes: {
     type: [String],
-    enum: ['Small', 'Medium', 'Large', 'X-Large'],
-    required: true
+enum: [
+      'Small',
+      'Medium',
+      'Large',
+      'X-Large',
+      'XXL',
+      '3XL',
+      '4XL',
+      '5XL'
+    ],
+        required: true
   },
   availableColors: {
     type: [String],
@@ -28,11 +37,15 @@ const ProductSchema = new mongoose.Schema({
   images: [{
     url: {
       type: String, // Cloudinary URL
-      required: true
+      required: false,
+              default: null
+
     },
     cloudinaryId: {
       type: String, // Cloudinary public_id
-      required: true
+      required: false,
+              default: null
+
     },
     isPrimary: {
       type: Boolean,
